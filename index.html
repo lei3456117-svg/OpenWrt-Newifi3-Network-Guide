@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newifi 3 (D2) OpenWrt 25.12.5 固件重刷、U盘扩容、DNS防污染与企业级网络分流实战手册</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --text-main: #1f2937;
+    --text-muted: #4b5563;
+    --border: #e5e7eb;
+    --bg-code: #1e293b;
+    --danger-bg: #fef2f2;
+    --danger-border: #ef4444;
+    --warn-bg: #fffbeb;
+    --warn-border: #f59e0b;
+    --success-bg: #f0fdf4;
+    --success-border: #10b981;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    color: var(--text-main);
+    max-width: 960px;
+    margin: 40px auto;
+    padding: 0 24px;
+    background-color: #fafafa;
+  }
+  .container {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border);
+  }
+  h1 { font-size: 2.1rem; color: #111827; border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-top: 0; }
+  h2 { font-size: 1.5rem; color: #1f2937; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 36px; }
+  h3 { font-size: 1.2rem; color: #374151; margin-top: 24px; }
+  p, li { color: var(--text-muted); font-size: 1rem; }
+  code {
+    background: #f3f4f6;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 0.9em;
+    color: #dc2626;
+  }
+  pre {
+    background: var(--bg-code);
+    color: #e2e8f0;
+    padding: 18px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    font-size: 0.88em;
+    line-height: 1.5;
+  }
+  .box { padding: 16px 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid; }
+  .box.note { background: var(--primary-light); border-color: var(--primary); color: #1e40af; }
+  .box.warn { background: var(--warn-bg); border-color: var(--warn-border); color: #92400e; }
+  .box.danger { background: var(--danger-bg); border-color: var(--danger-border); color: #991b1b; }
+  .box.success { background: var(--success-bg); border-color: var(--success-border); color: #065f46; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.95rem; }
+  th, td { border: 1px solid var(--border); padding: 12px 14px; text-align: left; }
+  th { background-color: #f9fafb; font-weight: 600; color: #374151; }
+  ol, ul { padding-left: 28px; }
+  li { margin-bottom: 8px; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.8rem; font-weight: 600; border-radius: 9999px; background: #e0e7ff; color: #3730a3; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Newifi 3 (D2) 固件重刷、U盘扩容、DNS防污染与企业级网络分流实战手册</h1>
+  
+  <p><strong>作者</strong>: Depp Pan<br>
+  <strong>硬件设备</strong>: 联想 Newifi 3 D2 (MediaTek MT7621AT, 512MB RAM, 32MB SPI Flash)<br>
+  <strong>固件版本</strong>: OpenWrt 25.12.5 正式版 (Linux Kernel 6.12, apk 软件包管理机制)<br>
+  <strong>网络环境</strong>: 公司企业网 (带 MAC 地址安全白名单与跨网段划分) + 桌面千兆交换机</p>
+
+  <div class="box note">
+    <strong>本教程核心解决痛点：</strong><br>
+    1. 误删 <code>dnsmasq</code> 导致路由器“变砖无法分发 IP”的终极救砖恢复；<br>
+    2. 机身闪存不足（仅 23MB 可用）无法承载现代代理插件，通过 U 盘进行 <strong>Extroot 根目录无感扩容</strong> 至 3.5GB；<br>
+    3. 为什么便宜订阅打不开 Google Anti-gravity / Codex / Gemini，而加装 <code>dnsmasq-full</code> 与防污染协议后“网络彻底变干净”并秒开；<br>
+    4. 企业桌面双链路架构：Mac 走高带宽低延迟独享 AI 线路，路由器发射 WiFi 走实惠节点供移动端摸鱼。
+  </div>
+
+  <h2>一、 核心概念与避坑必读（这两天最重要的经验总结）</h2>
+
+  <h3>1. 为什么误卸载 dnsmasq 导致路由器瘫痪？</h3>
+  <div class="box danger">
+    <strong>事故还原</strong>：<br>
+    原先路由器准备安装代理插件，过程中把系统的 <code>dnsmasq</code> 删除了。<br>
+    <strong>技术内幕</strong>：<br>
+    在 OpenWrt 中，<code>dnsmasq</code> 同时身兼两职：<strong>DHCP 服务器（向局域网手机/电脑分发 IP）</strong> 和 <strong>DNS 缓存代理（把域名解析为 IP）</strong>。一旦直接卸载它，局域网内的设备会立刻分配不到 IP（电脑提示 <code>169.254.x.x</code> 自分配私有地址），路由器自身也立刻丧失域名解析能力，导致后续从官方源下载安装 <code>dnsmasq-full</code> 的请求无法解析软件源域名，陷入“进不去后台也装不上软件”的死锁状态。
+  </div>
+
+  <h3>2. dnsmasq-full 与精简版 dnsmasq 的本质差异</h3>
+  <p>很多人以为完整版只是多了一点周边工具，实际上它是<strong>科学上网与规避 DNS 投毒的绝对核心生命线</strong>：</p>
+  <table>
+    <thead>
+      <tr><th>功能对比项</th><th>系统自带精简版 dnsmasq</th><th>全功能版 dnsmasq-full</th><th>对 AI / 科学上网的决定性影响</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>安装体积</strong></td>
+        <td>~180 KB</td>
+        <td>~380 KB</td>
+        <td>仅相差 200 KB，但内核编译参数截然不同</td>
+      </tr>
+      <tr>
+        <td><strong>基础 DHCP 与解析</strong></td>
+        <td> 支持</td>
+        <td> 支持</td>
+        <td>分配 192.168.1.x IP，普通国内网站解析</td>
+      </tr>
+      <tr>
+        <td><strong>IPSet / NFTables 动态集合</strong></td>
+        <td>❌ 彻底阉割</td>
+        <td> <strong>完整支持</strong></td>
+        <td><strong>分流命脉</strong>：将解析出来的真实海外 IP 动态注入防火墙名单交给代理核心，精简版不支持会导致分流彻底失效</td>
+      </tr>
+      <tr>
+        <td><strong>DNSSEC (DNS安全扩展)</strong></td>
+        <td>❌ 彻底阉割</td>
+        <td> <strong>完整支持</strong></td>
+        <td><strong>防投毒核心</strong>：校验上级 DNS 返回签名的真实性，彻底屏蔽运营商的假 IP 伪造</td>
+      </tr>
+      <tr>
+        <td><strong>高级分流与自定转发通道</strong></td>
+        <td>❌ 彻底阉割</td>
+        <td> <strong>完整支持</strong></td>
+        <td>配合 v2rayA / Xray 实现 DoH 加密解析与国内/海外流量精准拆分</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="box success">
+    <strong>为什么今天便宜订阅突然能连 Anti-gravity 了？</strong><br>
+    以前连接失败，不是因为节点便宜，而是因为国内运营商对 <code>alkalimakersuite-pa.clients6.google.com</code>（Anti-gravity 核心接口）进行了 <strong>DNS 域名投毒</strong>，精简版把假 IP 当真地址交给了 Mac，导致无法连通。<br>
+    昨天我们安装了 <strong><code>dnsmasq-full</code></strong> 并开启了 <strong>“防 DNS 污染协议”</strong>，路由器将 AI 域名的解析通过加密通道直接向海外官方发起请求，拿到了真实无污染的机房 IP。只要海外 IP 是真实的，哪怕几块钱的便宜美国节点也能瞬间秒开！
+  </div>
+
+  <h3>3. 为什么硬路由做旁路规则会导致 YouTube 4K 转圈（双重代理套娃）？</h3>
+  <div class="box warn">
+    <strong>问题现象</strong>：<br>
+    把 Mac 插在路由器 LAN 口，试图让 Mac 走本地的 Clash/Antify（昂贵美国节点），而路由器走 v2rayA（便宜节点），即使在路由器后台给 Mac 加上直连放行规则，访问 YouTube 依然严重卡顿，甚至 0 B/s。<br>
+    <strong>底层根因</strong>：<br>
+    v2rayA 开启透明代理（TProxy）后，是在 Netfilter 底层拦截端口 53 和所有非大陆流量。Mac 本地的 Antify 已经对数据包进行了一次封装，路由器接收到这个加密包后，由于不知道里面是什么，根据外部目标服务器又强行套上了一层 v2rayA 的代理，形成了 <strong>“代理包着代理”的双重代理套娃</strong>。双重握手产生巨大的延迟和近乎 100% 的丢包。<br>
+    <strong>终极解法</strong>：<br>
+    <strong>硬件物理隔离</strong>：把桌面交换机放在最前置，Mac 电脑直连交换机（纯净直出公司网），路由器 WAN 口插交换机（专职提供无线翻墙）。
+  </div>
+
+  <h2>二、 从零到一全流程实操部署记录</h2>
+
+  <h3>步骤 1：Breed 引导模式与固件重刷</h3>
+  <ol>
+    <li>路由器完全断电，使用卡针或牙签顶住 Newifi 3 背后的 <strong>RESET</strong> 小孔保持按住不放。</li>
+    <li>插入电源，观察路由器前面板指示灯。当指示灯开始<strong>交替闪烁/快速双闪</strong>时，松开 RESET 键。</li>
+    <li>网线连接电脑与路由器 LAN 口，此时路由器没有运行 DHCP，需手动配置 Mac 网卡：
+      <ul>
+        <li>打开 Mac【系统设置】->【网络】->【以太网】->【TCP/IP】；</li>
+        <li>配置 IPv4 改为 <strong>手动</strong>：IP 地址 <code>192.168.1.2</code>，子网掩码 <code>255.255.255.0</code>，网关 <code>192.168.1.1</code>。</li>
+      </ul>
+    </li>
+    <li>浏览器无痕窗口打开 <code>http://192.168.1.1</code>，进入 Breed Web 恢复控制台。</li>
+    <li>点击【固件更新】，上传下载好的官方纯净原版：<code>openwrt-25.12.5-ramips-mt7621-d-team_newifi-d2-squashfs-sysupgrade.bin</code> (7.4MB) 刷入。</li>
+    <li>刷入等待 2 分钟，将 Mac 网卡 IPv4 改回 <strong>“使用 DHCP”</strong>。</li>
+  </ol>
+
+  <h3>步骤 2：企业局域网环境适配（MAC 地址与 WAN 静态绑定）</h3>
+  <p>公司网络采用交换机端口与 MAC 白名单绑定机制，为了防止路由器抢占 Mac 电脑的身份，两台设备必须分别设置：</p>
+  <table>
+    <thead>
+      <tr><th>接入设备</th><th>物理硬件 MAC 地址</th><th>分配 IPv4 地址</th><th>网关 / 掩码 / DNS</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Mac 电脑</strong></td>
+        <td><code>6C:1F:F7:CD:18:52</code> (原机网卡)</td>
+        <td><code>172.16.122.57</code> (DHCP 自动分配)</td>
+        <td>172.16.122.254 / 255.255.255.0</td>
+      </tr>
+      <tr>
+        <td><strong>Newifi 3 路由器</strong></td>
+        <td><code>20:76:93:4A:E3:08</code> (出厂原生物理 MAC)</td>
+        <td><code>172.16.122.55</code> (静态绑定保留)</td>
+        <td>172.16.122.254 / 255.255.255.0<br>DNS: <code>221.6.4.66</code>, <code>114.114.114.114</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <pre><code># SSH 登录路由器写入 WAN 口网络配置 (/etc/config/network)
+uci set network.wan.proto='static'
+uci set network.wan.ipaddr='172.16.122.55'
+uci set network.wan.netmask='255.255.255.0'
+uci set network.wan.gateway='172.16.122.254'
+uci set network.wan.dns='221.6.4.66 114.114.114.114'
+uci set network.wan.macaddr='20:76:93:4a:e3:08'
+uci commit network
+/sbin/ifup wan</code></pre>
+
+  <h3>步骤 3：U 盘 Extroot 格式化与系统盘 3.5GB 扩容</h3>
+  <p>Newifi 3 仅剩 23MB Flash，安装 xray 核心与规则库需要近 100MB 空间，必须做外置存储扩容：</p>
+  <pre><code># 1. 安装磁盘驱动与分区格式化工具
+apk update
+apk add kmod-usb-storage kmod-fs-ext4 block-mount e2fsprogs fdisk
+
+# 2. 确认 U 盘设备号（/dev/sda1），将其格式化为 Linux ext4
+mkfs.ext4 -F /dev/sda1
+
+# 3. 将现有的 /overlay 系统文件完整同步复制进 U 盘
+mkdir -p /mnt/sda1
+mount /dev/sda1 /mnt/sda1
+cp -a -f /overlay/. /mnt/sda1/
+umount /mnt/sda1
+
+# 4. 配置系统开机自动把 U 盘挂载为系统根盘 /overlay
+uci set fstab.overlay='mount'
+uci set fstab.overlay.device='/dev/sda1'
+uci set fstab.overlay.target='/overlay'
+uci set fstab.overlay.enabled='1'
+uci commit fstab
+/etc/init.d/fstab enable
+
+# 5. 重启生效
+reboot</code></pre>
+  <p><em>重启后通过 <code>df -h /overlay</code> 检查，根分区可用容量成功变为 <strong>3.2 GB</strong>。</em></p>
+
+  <h3>步骤 4：核心组件与完整汉化包安装</h3>
+  <pre><code># 1. 软件源列表更新
+apk update
+
+# 2. 无缝平替安装全功能 dnsmasq-full
+apk del dnsmasq
+apk add dnsmasq-full
+
+# 3. 安装 v2rayA 及底层 xray 核心
+apk add v2raya xray-core luci-app-v2raya luci-i18n-v2raya-zh-cn
+
+# 4. 安装大陆分流规则数据库
+apk add v2ray-geoip v2ray-geosite
+
+# 5. 安装网页终端 TTYD 及全模块简体中文语言包
+apk add ttyd luci-app-ttyd luci-i18n-ttyd-zh-cn
+apk add luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-package-manager-zh-cn luci-i18n-attendedsysupgrade-zh-cn
+
+# 6. 启动并启用开机自启
+/etc/init.d/v2raya enable && /etc/init.d/v2raya start
+/etc/init.d/ttyd enable && /etc/init.d/ttyd start
+/etc/init.d/uhttpd restart</code></pre>
+
+  <h3>步骤 5：v2rayA 科学上网与 AI 多出口精准分流配置</h3>
+  <ol>
+    <li>浏览器进入后台：<code>http://192.168.1.1:2017</code>（首次进入设置用户名密码）。</li>
+    <li><strong>导入节点</strong>：点击右上角【导入】，推荐复制机场提供的 <strong>Shadowrocket（小火箭）订阅链接</strong> 粘贴拉取。</li>
+    <li><strong>多出口创建</strong>：
+      <ul>
+        <li>左上角在【正在运行】旁边，点击药丸标签旁边的设置，选择 <strong>【新增一个出口】</strong>，命名为：<code>OpenAi</code>；</li>
+        <li>在 <code>OpenAi</code> 出口绑定的节点下拉菜单中，选择你订阅里的 <strong>美国节点</strong>；</li>
+        <li>默认的 <code>PROXY</code> 出口绑定你日常使用的便宜香港/亚太节点。</li>
+      </ul>
+    </li>
+    <li><strong>全局参数调整</strong>：点击右上角【设置】：
+      <ul>
+        <li><strong>透明代理/系统代理</strong>：启用：大陆白名单模式</li>
+        <li><strong>透明代理实现方式</strong>：tproxy</li>
+        <li><strong>开启IP转发 / 开启端口分享</strong>：两个黄色高亮开关均<strong>开启</strong></li>
+        <li><strong>防止DNS污染</strong>：使用已配置的DNS协议防止DNS污染</li>
+      </ul>
+    </li>
+    <li><strong>自定义规则 RoutingA</strong>：滚到底部在规则框中写入以下分流规则：
+<pre><code>default: proxy
+# write your own rules below
+domain(openai.com)->OpenAi
+domain(chatgpt.com)->OpenAi
+domain(auth0.openai.com)->OpenAi
+domain(gemini.google.com)->OpenAi
+domain(generativelanguage.googleapis.com)->OpenAi
+domain(aistudio.google.com)->OpenAi
+domain(alkalimakersuite-pa.clients6.google.com)->OpenAi
+domain(domain:mail.qq.com)->direct
+
+domain(geosite:google-scholar)->proxy
+domain(geosite:category-scholar-!cn, geosite:category-scholar-cn)->direct
+domain(geosite:geolocation-!cn, geosite:google)->proxy
+domain(geosite:cn)->direct
+ip(geoip:hk,geoip:mo)->proxy
+ip(geoip:private, geoip:cn)->direct</code></pre>
+    </li>
+    <li>点击【保存并应用】，主界面勾选节点点击左上角【启动】。</li>
+  </ol>
+
+  <h2>三、 最终桌面物理网络拓扑图</h2>
+  <pre><code>                    ┌────────────────────────────────────────┐
+                    │      公司网络总线 (172.16.122.x)       │
+                    └───────────────────┬────────────────────┘
+                                        │ (接入桌面网口)
+                                        ▼
+                    ┌────────────────────────────────────────┐
+                    │      桌面千兆非网管物理交换机          │
+                    └───────────┬────────────────┬───────────┘
+                                │                │
+                                │                ▼
+                                │     ┌──────────────────────────────────────────┐
+                                │     │        Newifi 3 路由器 (WAN 口)          │
+                                │     │  - 物理硬件 MAC: 20:76:93:4A:E3:08       │
+                                │     │  - 静态 IPv4: 172.16.122.55              │
+                                │     │  - U 盘扩容 3.5GB (Extroot)              │
+                                │     │  - 核心服务: dnsmasq-full + v2rayA       │
+                                │     │  - 独立网页终端: TTYD (端口网页直接登录) │
+                                │     └────────────────────┬─────────────────────┘
+                                │                          │
+                                │                          ▼ (发射无线 WiFi)
+                                │             ┌─────────────────────────┐
+                                │             │   移动端手机 / 平板设备 │
+                                │             │   - 自动走大陆白名单    │
+                                │             │   - 便宜节点无感省流    │
+                                │             └─────────────────────────┘
+                                ▼
+                    ┌────────────────────────────────────────┐
+                    │            Mac 工作电脑 (有线网卡)     │
+                    │  - 网卡物理 MAC: 6C:1F:F7:CD:18:52     │
+                    │  - DHCP 分配 IP: 172.16.122.57         │
+                    │  - 网络状态: 纯净直连公司千兆骨干网    │
+                    │  - 代理方案: 本地 Clash + Antify       │
+                    │  - 独享极速: YouTube 4K 秒开，         │
+                    │    Codex / Gemini / AI Studio 极速响应 │
+                    └────────────────────────────────────────┘</code></pre>
+</div>
+
+</body>
+</html>
