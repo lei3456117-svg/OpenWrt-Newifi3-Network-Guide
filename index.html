@@ -287,7 +287,21 @@
   <h2>二、 从零到一全流程实操部署记录</h2>
 
   <h3>步骤 1：Breed 引导模式与固件重刷</h3>
+  <div class="box note">
+    <strong>💡 极简部署原则：全流程仅需下载 1 个外部固件！</strong><br>
+    你不需要在电脑上四处寻找或下载任何第三方 ipk/apk 离线包。<strong>电脑端唯一需要提前下载的只有 OpenWrt 官方纯净系统镜像</strong>。只要路由器刷入系统并连通网络，后续所有的 U 盘驱动、扩容工具、<code>dnsmasq-full</code>、<code>v2rayA</code>、<code>Xray-core</code>、网页终端及中文语言包，<strong>全部直接在路由器后台（LuCI 界面或终端命令）通过官方软件源在线一键拉取</strong>！
+  </div>
+
   <ol>
+    <li>
+      <strong>获取官方纯净固件</strong>：
+      <ul>
+        <li><strong>OpenWrt 官方固件目录 (MT7621 / Newifi D2)</strong>：<br>
+          <a href="https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt7621/" target="_blank">https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt7621/</a></li>
+        <li><strong>官方系统升级/刷机包直接下载链接 (.bin)</strong>：<br>
+          <a href="https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt7621/openwrt-25.12.5-ramips-mt7621-d-team_newifi-d2-squashfs-sysupgrade.bin" target="_blank">openwrt-25.12.5-ramips-mt7621-d-team_newifi-d2-squashfs-sysupgrade.bin (约 7.4 MB)</a></li>
+      </ul>
+    </li>
     <li>路由器完全断电，使用卡针或牙签顶住 Newifi 3 背后的 <strong>RESET</strong> 小孔保持按住不放。</li>
     <li>插入电源，观察路由器前面板指示灯。当指示灯开始<strong>交替闪烁/快速双闪</strong>时，松开 RESET 键。</li>
     <li>网线连接电脑与路由器 LAN 口，此时路由器没有运行 DHCP，需手动配置 Mac 网卡：
@@ -297,7 +311,7 @@
       </ul>
     </li>
     <li>浏览器无痕窗口打开 <code>http://192.168.1.1</code>，进入 Breed Web 恢复控制台。</li>
-    <li>点击【固件更新】，上传下载好的官方纯净原版：<code>openwrt-25.12.5-ramips-mt7621-d-team_newifi-d2-squashfs-sysupgrade.bin</code> (7.4MB) 刷入。</li>
+    <li>点击【固件更新】，上传刚才下载的官方纯净镜像 <code>openwrt-25.12.5-...-sysupgrade.bin</code> 刷入。</li>
     <li>刷入等待 2 分钟，将 Mac 网卡 IPv4 改回 <strong>“使用 DHCP”</strong>。</li>
   </ol>
 
