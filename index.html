@@ -88,12 +88,12 @@
     4. 企业桌面双链路架构：Mac 走高带宽低延迟独享 AI 线路，路由器发射 WiFi 走实惠节点供移动端摸鱼。
   </div>
 
-  <h2>一、 核心概念与避坑必读（这两天最重要的经验总结）</h2>
+  <h2>一、 核心概念与避坑必读（核心实战经验总结）</h2>
 
   <h3>1. 为什么误卸载 dnsmasq 导致路由器瘫痪？</h3>
   <div class="box danger">
     <strong>事故还原</strong>：<br>
-    原先路由器准备安装代理插件，过程中把系统的 <code>dnsmasq</code> 删除了。<br>
+    在早期尝试安装代理插件时，过程中把系统的 <code>dnsmasq</code> 删除了。<br>
     <strong>技术内幕</strong>：<br>
     在 OpenWrt 中，<code>dnsmasq</code> 同时身兼两职：<strong>DHCP 服务器（向局域网手机/电脑分发 IP）</strong> 和 <strong>DNS 缓存代理（把域名解析为 IP）</strong>。一旦直接卸载它，局域网内的设备会立刻分配不到 IP（电脑提示 <code>169.254.x.x</code> 自分配私有地址），路由器自身也立刻丧失域名解析能力，导致后续从官方源下载安装 <code>dnsmasq-full</code> 的请求无法解析软件源域名，陷入“进不去后台也装不上软件”的死锁状态。
   </div>
@@ -138,9 +138,9 @@
     </tbody>
   </table>
   <div class="box success">
-    <strong>为什么今天便宜订阅突然能连 Anti-gravity 了？</strong><br>
-    以前连接失败，不是因为节点便宜，而是因为国内运营商对 <code>alkalimakersuite-pa.clients6.google.com</code>（Anti-gravity 核心接口）进行了 <strong>DNS 域名投毒</strong>，精简版把假 IP 当真地址交给了 Mac，导致无法连通。<br>
-    昨天我们安装了 <strong><code>dnsmasq-full</code></strong> 并开启了 <strong>“防 DNS 污染协议”</strong>，路由器将 AI 域名的解析通过加密通道直接向海外官方发起请求，拿到了真实无污染的机房 IP。只要海外 IP 是真实的，哪怕几块钱的便宜美国节点也能瞬间秒开！
+    <strong>为什么配置完成后，便宜订阅也能稳定连接 Anti-gravity / Gemini？</strong><br>
+    原先连接失败，很多时候不是因为节点便宜，而是因为国内网络环境对 <code>alkalimakersuite-pa.clients6.google.com</code>（Anti-gravity 核心接口）进行了 <strong>DNS 域名投毒</strong>，精简版把假 IP 当真地址交给了电脑，导致通信直接中断。<br>
+    当正确安装了 <strong><code>dnsmasq-full</code></strong> 并开启了 <strong>“防 DNS 污染协议”</strong> 后，路由器将 AI 域名的解析通过加密通道直接向海外官方发起请求，拿到了真实无污染的机房 IP。只要海外 IP 是真实的，哪怕几块钱的便宜美国节点也能瞬间秒开！
   </div>
 
   <h3>3. 为什么硬路由做旁路规则会导致 YouTube 4K 转圈（双重代理套娃）？</h3>
