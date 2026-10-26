@@ -284,6 +284,40 @@
   ✨ 完美效果：
   电脑与路由器在物理层平级并联，Mac 流量 100% 绕开路由器审查，彻底告别套娃！</code></pre>
 
+  <h3>4. 为什么 v2rayA 突然打不开管理面板（2017端口拒绝连接）与 MIPS Go 崩溃死循环？</h3>
+  <div class="box danger">
+    <strong>问题现象</strong>：<br>
+    使用过程中突然发现无线设备无法翻墙，浏览器打开 <code>http://192.168.1.1:2017</code> 显示“连接被拒绝”（ERR_CONNECTION_REFUSED），但路由器 LuCI 后台与 SSH 依然完全正常。<br>
+    <strong>底层根因</strong>：<br>
+    OpenWrt 官方软件源中的 <code>v2raya-2.2.7.5-r1</code> 存在 MIPS 架构下 Go 运行时符号表校验缺陷（<code>moduledataverify1</code> 越界），导致服务启动时抛出 <code>fatal error: index out of range / runtime: panic before malloc heap initialized</code>，进入 Procd 崩溃死循环（Crash Loop）被系统强制停止。<br>
+    <strong>修复方案</strong>：<br>
+    通过 SSH 连入路由器，执行官方软件源平替升级至 <code>v2raya-2.2.7.5-r2</code> 修复版：
+  </div>
+
+  <pre><code># 1. 登录路由器查看崩溃定位
+logread | grep -i v2raya
+# 输出可见: Instance v2raya::v2raya is in a crash loop / panic before malloc heap initialized
+
+# 2. 更新软件索引并升级至 r2 修复包
+apk update
+apk add -u v2raya
+
+# 3. 验证二进制运行正常（退出码 0，无 panic）
+/usr/bin/v2raya --version
+# 输出: 2.2.7.5
+
+# 4. 重启 v2rayA 服务并确认 2017 端口监听
+/etc/init.d/v2raya restart
+netstat -tulpn | grep 2017
+
+# 5. 打开 http://192.168.1.1:2017 更新订阅并启动节点</code></pre>
+
+  <div class="box warn">
+    <strong>连带避坑（客户端双重代理套娃复发）</strong>：<br>
+    节点启动后，若测试发现打开 YouTube 依然存在高达 3~5 秒的严重卡顿延迟，请首先排查测试设备是否<strong>同时开启了 Antify / Clash 等本地代理客户端</strong>！<br>
+    终端设备（手机/电脑）在连入 Newifi 3 WiFi 后，数据已被路由器 TProxy 内核接管；若本机再开代理软件，会再次触发“双重代理套娃”与 DNS 抢答。只要关闭客户端本地代理软件，或保持 Mac 直连交换机，即可秒开 4K！
+  </div>
+
   <h2>二、 从零到一全流程实操部署记录</h2>
 
   <h3>步骤 1：Breed 引导模式与固件重刷</h3>
