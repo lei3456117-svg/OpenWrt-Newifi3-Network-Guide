@@ -111,9 +111,12 @@ reboot
 # 1. 更新包索引
 apk update
 
-# 2. 平替安装完整版 dnsmasq
+# 2. 平替安装完整版 dnsmasq 并开启 IPv6 过滤
 apk del dnsmasq
 apk add dnsmasq-full
+uci set dhcp.@dnsmasq[0].filter_aaaa='1'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
 
 # 3. 安装 v2rayA 与 xray 转发核心 (使用修复版 r2)
 apk add v2raya xray-core luci-app-v2raya luci-i18n-v2raya-zh-cn
@@ -131,13 +134,32 @@ apk add luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-package-manager-
 ```
 
 ### 步骤 5：v2rayA 界面配置规范
-1. 打开浏览器登录 v2rayA 面板：`http://192.168.1.1:2017`。
+1. 打开浏览器登录 v2rayA 面板：`http://192.168.1.1:2017`（首次进入设置账号密码）。
 2. 点击右上角 **设置**（齿轮图标）：
    * **透明代理/系统代理**：选择 `启用: 大陆白名单模式`。
    * **透明代理实现方式**：选择 `tproxy`。
-   * **开启 IP 转发 / 开启端口分享**：两个黄色选项均点亮开启。
+   * **开启 IP 转发 / 开启端口分享**：两个选项均**开启**（端口分享将 Socks5: 20170 和 HTTP: 20171 开放给局域网设备按需使用）。
    * **防止 DNS 污染**：选择 `使用已配置的DNS协议防止DNS污染`（避免软解 DoH 阻塞 CPU）。
-3. 导入节点订阅，勾选低延迟节点并点击左上角【启动】。
+3. 底部 **自定义规则 RoutingA**：填入以下精简分流规则（含 NAS 直连与防 15s 看门狗超时优化）：
+```text
+default: proxy
+ip(192.168.1.198) -> direct
+domain(openai.com)->OpenAi
+domain(chatgpt.com)->OpenAi
+domain(auth0.openai.com)->OpenAi
+domain(gemini.google.com)->OpenAi
+domain(generativelanguage.googleapis.com)->OpenAi
+domain(aistudio.google.com)->OpenAi
+domain(alkalimakersuite-pa.clients6.google.com)->OpenAi
+domain(domain:mail.qq.com)->direct
+domain(geosite:cn)->direct
+ip(geoip:private, geoip:cn)->direct
+```
+> 💡 **防超时关键说明**：切勿在规则中添加 `geosite:geolocation-!cn`。MT7621 解析该 10.8MB 规则库需 17.3 秒，会触发 v2rayA 15 秒核心启动看门狗超时崩溃。上述 12 行精简规则依靠 `default: proxy` 兜底，启动仅需 2.48 秒！
+4. **多出口与启动**：
+   * 在左上角新增出口：`OpenAi`，绑定订阅中的 **美国节点**；
+   * 默认 `PROXY` 出口绑定日常低延迟亚太节点；
+   * 点击左上角【启动】生效。
 
 ---
 

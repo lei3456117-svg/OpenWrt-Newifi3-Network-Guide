@@ -313,9 +313,23 @@ netstat -tulpn | grep 2017
 # 5. 打开 http://192.168.1.1:2017 更新订阅并启动节点</code></pre>
 
   <div class="box warn">
-    <strong>连带避坑（客户端双重代理套娃复发）</strong>：<br>
-    节点启动后，若测试发现打开 YouTube 依然存在高达 3~5 秒的严重卡顿延迟，请首先排查测试设备是否<strong>同时开启了 Antify / Clash 等本地代理客户端</strong>！<br>
-    终端设备（手机/电脑）在连入 Newifi 3 WiFi 后，数据已被路由器 TProxy 内核接管；若本机再开代理软件，会再次触发“双重代理套娃”与 DNS 抢答。只要关闭客户端本地代理软件，或保持 Mac 直连交换机，即可秒开 4K！
+    <strong>连带避坑（客户端双重代理套娃与上网影响解答）</strong>：<br>
+    <strong>问：连着路由器 Wi-Fi/网线时，电脑如果开着 Clash / 代理软件，还能正常上网吗？</strong><br>
+    <strong>答：能正常上网，绝对不会断网！</strong><br>
+    <ul>
+      <li><strong>国内网络（微信、百度、淘宝等）</strong>：完全正常秒开，两端都走直连，速度不受任何影响；</li>
+      <li><strong>海外网络（YouTube、Google 等）</strong>：完全可以正常打开和看视频，仅在首包建立连接时因“双重加解密”可能多等 1~2 秒；</li>
+      <li><strong>建议</strong>：日常忘了关电脑代理完全不用担心断网；若想追求最极致的 4K 极速秒开与电脑省电，随手关掉本地代理体验最好。</li>
+    </ul>
+  </div>
+
+  <h3>5. 为什么纯 IPv4 企业网络下必须开启 IPv6 过滤（filter_aaaa=1）？</h3>
+  <div class="box note">
+    <strong>底层根因与现象</strong>：<br>
+    公司上级骨干网是纯 IPv4 环境，根本没有下发公网 IPv6 地址与网关路由。但在访问 YouTube、Google 时，国内 DNS 或运营商常常返回虚假的 IPv6 污染地址（如 <code>2001::1</code>）。客户端设备拿到该假地址后会优先尝试建立 IPv6 连接，因网络不可达导致陷入 <strong>15~30 秒严重超时卡顿</strong>或直接报错。<br>
+    <strong>一键解决</strong>：<br>
+    在安装 <code>dnsmasq-full</code> 后，开启 IPv6 AAAA 记录过滤，让路由器直接拦截丢弃 IPv6 解析，强制所有内网设备 100% 纯走 IPv4：
+    <pre><code>uci set dhcp.@dnsmasq[0].filter_aaaa='1' && uci commit dhcp && /etc/init.d/dnsmasq restart</code></pre>
   </div>
 
   <h2>二、 从零到一全流程实操部署记录</h2>
@@ -411,9 +425,12 @@ reboot</code></pre>
   <pre><code># 1. 软件源列表更新
 apk update
 
-# 2. 无缝平替安装全功能 dnsmasq-full
+# 2. 无缝平替安装全功能 dnsmasq-full 并开启 IPv6 过滤
 apk del dnsmasq
 apk add dnsmasq-full
+uci set dhcp.@dnsmasq[0].filter_aaaa='1'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
 
 # 3. 安装 v2rayA 及底层 xray 核心
 apk add v2raya xray-core luci-app-v2raya luci-i18n-v2raya-zh-cn
@@ -445,13 +462,16 @@ apk add luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-package-manager-
       <ul>
         <li><strong>透明代理/系统代理</strong>：启用：大陆白名单模式</li>
         <li><strong>透明代理实现方式</strong>：tproxy</li>
-        <li><strong>开启IP转发 / 开启端口分享</strong>：两个黄色高亮开关均<strong>开启</strong></li>
+        <li><strong>开启IP转发 / 开启端口分享</strong>：两个开关均<strong>开启</strong>（端口分享向局域网开放 Socks5: 20170 和 HTTP: 20171 供电脑开发或特定软件按需使用）</li>
         <li><strong>防止DNS污染</strong>：使用已配置的DNS协议防止DNS污染</li>
       </ul>
     </li>
-    <li><strong>自定义规则 RoutingA</strong>：滚到底部在规则框中写入以下分流规则：
+    <li><strong>自定义规则 RoutingA</strong>：滚到底部在规则框中写入以下精简分流规则（含 NAS 直连与防 15 秒看门狗超时优化）：
 <pre><code>default: proxy
-# write your own rules below
+# NAS 局域网直连，保障内网千兆与打洞速度
+ip(192.168.1.198) -> direct
+
+# AI 核心域名分流至美国专属出口
 domain(openai.com)->OpenAi
 domain(chatgpt.com)->OpenAi
 domain(auth0.openai.com)->OpenAi
@@ -459,14 +479,15 @@ domain(gemini.google.com)->OpenAi
 domain(generativelanguage.googleapis.com)->OpenAi
 domain(aistudio.google.com)->OpenAi
 domain(alkalimakersuite-pa.clients6.google.com)->OpenAi
-domain(domain:mail.qq.com)->direct
 
-domain(geosite:google-scholar)->proxy
-domain(geosite:category-scholar-!cn, geosite:category-scholar-cn)->direct
-domain(geosite:geolocation-!cn, geosite:google)->proxy
+# 国内常用直连名单
+domain(domain:mail.qq.com)->direct
 domain(geosite:cn)->direct
-ip(geoip:hk,geoip:mo)->proxy
 ip(geoip:private, geoip:cn)->direct</code></pre>
+    <div class="box note">
+      <strong>💡 规则精简与防超时关键说明</strong>：<br>
+      请务必<strong>移除</strong>旧规则中的 <code>geosite:geolocation-!cn</code>！该规则会触发加载高达 10.8MB 的全量规则库，导致 Newifi 3 (MT7621) 处理器耗时 17 秒以上运算，从而触发 v2rayA 15 秒核心启动看门狗崩溃报错。精简后首行 <code>default: proxy</code> 会默认接管海外流量，启动耗时由 17 秒骤降至 <strong>2.48 秒</strong>！
+    </div>
     </li>
     <li>点击【保存并应用】，主界面勾选节点点击左上角【启动】。</li>
   </ol>
