@@ -114,6 +114,8 @@ domain(cursor.com) -> OpenAi
 domain(cursor.sh) -> OpenAi
 domain(cursorapi.com) -> OpenAi
 domain(todesktop.com) -> OpenAi
+domain(x.ai) -> OpenAi
+domain(grok.com) -> OpenAi
 
 # 国内常用服务直连
 domain(domain:mail.qq.com) -> direct
