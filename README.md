@@ -202,3 +202,44 @@ ip(geoip:private, geoip:cn)->direct
                     │    Codex / Gemini / AI Studio 极速响应 │
                     └────────────────────────────────────────┘
 ```
+
+---
+
+## 四、 节点更换、Xray 26 内核暴雷与官方原生 v2ray-core 离线包 (2026-10-28 增补)
+
+### 1. 深度故障排错与解决手册
+- 📄 **Markdown 完整手册**：[`v2rayA节点更换与Xray内核兼容故障排查实战手册.md`](v2rayA节点更换与Xray内核兼容故障排查实战手册.md)
+- 🌐 **独立排版 HTML 手册**：[`v2rayA节点更换与Xray内核兼容故障排查实战手册.html`](v2rayA节点更换与Xray内核兼容故障排查实战手册.html)
+- 📦 **免外网一键独立离线安装包**：`v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz` (27 MB)
+
+### 2. Xray 26+ 激进删除 `allowInsecure` 踩坑与终极平替
+* **现象**：换用部分优质国内中转 Trojan 节点时，节点显示“已连接”，但服务一启动就崩溃（`exit status 23`），或连上后打不开任何外网网页（握手被直接 Reset）。
+* **根因**：中转 Trojan 节点普遍采用伪装 SNI（如 `baidu.com`），真实证书为第三方域名，强依赖跳过证书校验（`allowInsecure: true`）。OpenWrt 官方默认绑定的 Xray 26.3.27 强行废除了该参数，将其作为非法语法阻断。
+* **终极解法**：安装 OpenWrt 官方软件源提供的原生 **`v2ray-core (5.53.0)`** 并通过 `uci set v2raya.config.v2ray_bin='/usr/bin/v2ray'` 绑定。官方原生 v2ray-core 完整支持该机制，秒开 YouTube（HTTP/2 200）。
+
+### 3. 最新全功能双出口 RoutingA 规则（含 Claude & Cursor）
+```text
+default: proxy
+ip(100.64.0.0/10) -> direct
+port(3478, 41641) -> direct
+ip(192.168.1.198) -> direct
+domain(openai.com) -> OpenAi
+domain(chatgpt.com) -> OpenAi
+domain(auth0.openai.com) -> OpenAi
+domain(gemini.google.com) -> OpenAi
+domain(generativelanguage.googleapis.com) -> OpenAi
+domain(aistudio.google.com) -> OpenAi
+domain(alkalimakersuite-pa.clients6.google.com) -> OpenAi
+domain(anthropic.com) -> OpenAi
+domain(claude.ai) -> OpenAi
+domain(claude.com) -> OpenAi
+domain(claude.usercontent.com) -> OpenAi
+domain(cursor.com) -> OpenAi
+domain(cursor.sh) -> OpenAi
+domain(cursorapi.com) -> OpenAi
+domain(todesktop.com) -> OpenAi
+domain(domain:mail.qq.com) -> direct
+domain(geosite:cn) -> direct
+ip(geoip:private, geoip:cn) -> direct
+```
+

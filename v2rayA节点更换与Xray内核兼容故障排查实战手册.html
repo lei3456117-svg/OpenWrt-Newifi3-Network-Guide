@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>v2rayA 与 v2ray-core 架构解析、内核兼容故障与离线安装手册 (终极典藏版)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --code-bg: #090d16;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 24px;
+    }
+    .container { max-width: 920px; margin: 0 auto; }
+    header { padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+    h1 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .meta-badges { display: flex; flex-wrap: wrap; gap: 10px; }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500;
+      background-color: var(--border); color: var(--text-muted);
+    }
+    .badge.green { background-color: rgba(34, 197, 94, 0.15); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge.blue { background-color: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.3); }
+    h2 { font-size: 19px; font-weight: 600; margin: 36px 0 16px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .step-list { list-style: none; counter-reset: step-counter; }
+    .step-item { position: relative; padding-left: 42px; margin-bottom: 20px; }
+    .step-item:last-child { margin-bottom: 0; }
+    .step-item::before {
+      content: counter(step-counter); counter-increment: step-counter; position: absolute; left: 0; top: 0;
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #000; font-weight: 700;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+    }
+    .step-title { font-weight: 600; color: #fff; font-size: 15px; margin-bottom: 6px; }
+    .step-desc { color: var(--text-muted); font-size: 14px; }
+    pre {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+      overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px; color: #e2e8f0; margin-top: 10px; line-height: 1.5;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent);
+    }
+    .alert { border-left: 4px solid; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; background: rgba(255, 255, 255, 0.03); }
+    .alert.info { border-color: var(--accent); }
+    .alert.warn { border-color: var(--warning); }
+    .alert.success { border-color: var(--success); }
+    .alert.danger { border-color: var(--danger); }
+    .alert-title { display: block; margin-bottom: 6px; font-weight: 600; color: #fff; font-size: 14.5px; }
+    .alert strong { color: #fff; font-weight: 600; }
+    .alert p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0; }
+    .copy-box { position: relative; }
+    .download-action-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(30, 41, 59, 0.8));
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .download-action-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.2);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(30, 41, 59, 0.9));
+    }
+    .download-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .download-title {
+      font-size: 15.5px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .download-subtitle {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .download-btn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 8px 18px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+    .copy-btn {
+      position: absolute; top: 18px; right: 10px; background: var(--border); color: var(--text-main);
+      border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: background 0.2s;
+    }
+    .copy-btn:hover { background: var(--accent-hover); }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 12px 0; }
+    th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
+    th { background: rgba(255, 255, 255, 0.05); color: #fff; }
+    td { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>v2rayA 与 v2ray-core 架构解析、内核兼容故障与离线安装手册</h1>
+      <div class="meta-badges">
+        <span class="badge blue">适用设备: Newifi 3 (D2) MT7621</span>
+        <span class="badge blue">系统: OpenWrt 25.12.5</span>
+        <span class="badge blue">组合: v2rayA 2.2.7.5-r2 + v2ray-core 5.53.0-r1</span>
+        <span class="badge green">状态: YouTube HTTP/2 200 验证通过</span>
+        <span class="badge">更新: 2026-10-28</span>
+      </div>
+    </header>
+
+    <h2>一、 核心概念：v2rayA 与 v2ray-core 的本质区别</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>v2rayA (控制面 Control Plane)</th>
+            <th>v2ray-core (数据面 Data Plane)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>角色定位</strong></td>
+            <td><strong>图形面板与自动化配置大脑</strong></td>
+            <td><strong>底层网络流量加密与发包引擎</strong></td>
+          </tr>
+          <tr>
+            <td><strong>程序路径</strong></td>
+            <td><code>/usr/bin/v2raya</code></td>
+            <td><code>/usr/bin/v2ray</code></td>
+          </tr>
+          <tr>
+            <td><strong>对外职责</strong></td>
+            <td>监听 2017 端口提供 Web 管理、订阅解析、TProxy 规则生成</td>
+            <td>建立 TLS 隧道、加解密数据、与机场服务器握手发包</td>
+          </tr>
+          <tr>
+            <td><strong>昨日崩溃定位</strong></td>
+            <td><strong>昨日崩溃的是它</strong>（r1 版在 MIPS 下 Go 符号表越界 panic）</td>
+            <td><strong>从未崩溃过</strong>（代码成熟，长期工业级稳定）</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="alert info">
+        <div class="alert-title">💡 形象比喻</div>
+        <p><code>v2rayA</code> 是你在浏览器看到的<strong>驾驶舱和方向盘</strong>，而 <code>v2ray-core</code> 是底下真正提供动力的<strong>发动机</strong>。</p>
+      </div>
+    </div>
+
+    <h2>二、 官方为什么默认捆绑 Xray，以及为什么换节点会暴雷？</h2>
+    <div class="card">
+      <div class="alert warn">
+        <div class="alert-title">1. 官方软件源打包捆绑</div>
+        <p>在 OpenWrt 软件源中查询 <code>apk info -R v2raya</code>，其显式声明了依赖 <code>xray-core</code>。因此安装 v2rayA 时系统会自动带上 Xray，默认不带原版 v2ray-core。</p>
+      </div>
+      <div class="alert danger">
+        <div class="alert-title">2. 今日暴雷根因：Xray 激进删除了 allowInsecure</div>
+        <p>Xray 在最新的 <code>26.3.27</code> 中强行废除了跳过证书验证功能。而许多国内中转 Trojan 节点为了防封锁，普遍采用大厂域名伪装 SNI（例如使用 <code>baidu.com</code> 伪装），但中转机自身的真实证书是 <code>*.appletls.com</code>，强依赖跳过验证。Xray 读取即闪退或阻断握手，造成连得上但打不开网页。</p>
+      </div>
+    </div>
+
+    <h2>三、 切换为官方原生 v2ray-core 的 4 大好处</h2>
+    <div class="card">
+      <div class="alert success">
+        <div class="alert-title">为什么使用 v2ray-core 是长治久安的最优解？</div>
+        <ul style="padding-left: 20px; margin-top: 8px; line-height: 1.7;">
+          <li><strong>协议全量原生兼容</strong>：官方原生 <code>v2ray-core</code> 完整支持 <code>allowInsecure: true</code>，彻底终结 Trojan 伪装域名的握手 Reset 故障。</li>
+          <li><strong>工业级长久稳定</strong>：代码风格严谨克制，不会像 Xray 频繁搞破坏性语法重构，保障机场订阅即插即用。</li>
+          <li><strong>无死循环崩溃隐患</strong>：MIPS 架构实测平稳，与已升级 <code>r2</code> 修复版的 v2rayA 完美融合，杜绝 Go 符号表 panic。</li>
+          <li><strong>CPU 极速响应</strong>：启动规则仅需 0.2 秒，完全不触发 MT7621 CPU 的 15 秒看门狗复位。</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>四、 独立离线安装包（适合日后直接恢复与分发）</h2>
+    <div class="card">
+      <a class="download-action-card" href="./v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz" download="v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz" title="点击直接下载离线安装包">
+        <div class="download-info">
+          <div class="download-title">📦 一键下载独立离线整合安装包</div>
+          <div class="download-subtitle">文件: v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz (27.0 MB)</div>
+        </div>
+        <div class="download-btn-pill">
+          <span>⬇️ 立即下载</span>
+        </div>
+      </a>
+
+      <p style="margin-bottom: 12px; color: #fff; font-weight: 600;">离线安装包已制作完成并放置在同级目录下：</p>
+      <ul style="padding-left: 20px; margin-bottom: 16px; color: var(--text-muted); font-size: 14px;">
+        <li>本地文件路径：<code>/Users/depp/Antigravity/公司或家庭网络搭建/v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz</code></li>
+        <li>解压后目录：<code>v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2/</code></li>
+        <li>内含完整组件：<code>v2ray-core (5.53)</code>、<code>v2raya (2.2.7.5-r2)</code>、中文 LuCI 菜单与 Geo 规则库</li>
+        <li>内置脚本：<code>install.sh</code>（全自动一键安装并绑定内核）、<code>uninstall.sh</code>（一键清理）</li>
+      </ul>
+
+      <div class="copy-box">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">若日后重刷固件或换机，在终端执行以下两行命令即可全自动恢复：</p>
+        <pre><code id="install-cmd"># 1. 传包到路由器
+scp -O v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz root@192.168.1.1:/tmp/
+
+# 2. 一键静默安装并自动绑定 v2ray-core 内核
+ssh root@192.168.1.1 "cd /tmp && tar -zxvf v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2.tar.gz && cd v2raya_v2ray-core_完美独立离线安装包_Newifi3_D2 && ./install.sh"</code></pre>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('install-cmd').innerText); this.innerText='已复制'; setTimeout(()=>this.innerText='复制', 2000);">复制</button>
+      </div>
+    </div>
+
+    <h2>五、 双出口分流规则（RoutingA）通用教学模板</h2>
+    <div class="card">
+      <p style="margin-bottom: 12px; color: var(--text-muted); font-size: 14px;">
+        本规则为开源通用模板。包含<strong>基础双出口分流</strong>与<strong>可选的异地组网/NAS扩展模块</strong>，读者可直接复制使用：
+      </p>
+      <pre><code>default: proxy
+
+# ==========================================
+# 【基础分流：AI 走美国，国内直连】(所有人通用)
+# ==========================================
+domain(openai.com) -> OpenAi
+domain(chatgpt.com) -> OpenAi
+domain(auth0.openai.com) -> OpenAi
+domain(gemini.google.com) -> OpenAi
+domain(generativelanguage.googleapis.com) -> OpenAi
+domain(aistudio.google.com) -> OpenAi
+domain(alkalimakersuite-pa.clients6.google.com) -> OpenAi
+
+# Anthropic & Claude 核心域名
+domain(anthropic.com) -> OpenAi
+domain(claude.ai) -> OpenAi
+domain(claude.com) -> OpenAi
+domain(claude.usercontent.com) -> OpenAi
+
+# Cursor 核心域名与 API
+domain(cursor.com) -> OpenAi
+domain(cursor.sh) -> OpenAi
+domain(cursorapi.com) -> OpenAi
+domain(todesktop.com) -> OpenAi
+
+# 国内常用服务直连
+domain(domain:mail.qq.com) -> direct
+domain(geosite:cn) -> direct
+ip(geoip:private, geoip:cn) -> direct
+
+# ==========================================
+# 【进阶扩展：Tailscale 组网与本地 NAS】(按需选填)
+# ==========================================
+# 1. Tailscale 全球通用虚拟网段 (RFC 6598 标准，所有 Tailscale 用户通用)
+ip(100.64.0.0/10) -> direct
+
+# 2. 国际标准 STUN 打洞端口(3478) 与 Tailscale 默认通信端口(41641)
+port(3478, 41641) -> direct
+
+# 3. 本地 NAS 内网千兆直连 (读者需替换为自己局域网 NAS 的实际 IP)
+ip(192.168.1.198) -> direct</code></pre>
+      <div class="alert info">
+        <div class="alert-title">📌 读者按需说明</div>
+        <p>1. <code>100.64.0.0/10</code> 和 <code>3478, 41641</code> 是 Tailscale 异地组网的国际通用标准，所有用 Tailscale 的人通用。</p>
+        <p>2. 局域网有 NAS 存储的用户，请把 <code>192.168.1.198</code> 改为自己家 NAS 的真实局域网 IP；若没有 NAS 可直接删去该行。</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
