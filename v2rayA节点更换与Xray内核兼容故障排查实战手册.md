@@ -113,6 +113,9 @@ domain(claude.usercontent.com) -> OpenAi
 domain(cursor.com) -> OpenAi
 domain(cursor.sh) -> OpenAi
 domain(cursorapi.com) -> OpenAi
+domain(workos.com) -> OpenAi
+domain(workoscdn.com) -> OpenAi
+domain(cursorusercontent.com) -> OpenAi
 domain(x.ai) -> OpenAi
 domain(grok.com) -> OpenAi
 
