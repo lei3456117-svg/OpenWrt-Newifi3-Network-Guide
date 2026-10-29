@@ -418,7 +418,7 @@ ip(geoip:private, geoip:cn) -> direct</code></pre>
           <div class="step-title">3 大掉线根因</div>
           <div class="step-desc">
             1. <strong>36 低频信道 Bug</strong>：Newifi 3 的 <code>MT76x2E</code> 5G 芯片在 36 信道配合 80MHz 频宽（VHT80）且缺省国家码时，易触发开源驱动看门狗强行重启。<br>
-            2. <strong>双频同名踢线</strong>：2.4G 与 5G 采用相同名称（如 <code>Depp</code>）而未启用 802.11k/v/r 漫游守护时，终端设备在双频间频繁跳变，被驱动判定超时踢下线（<code>deauthenticated due to inactivity</code>）。<br>
+            2. <strong>双频同名踢线</strong>：2.4G 与 5G 采用相同名称（如 <code>MyWiFi</code>）而未启用 802.11k/v/r 漫游守护时，终端设备在双频间频繁跳变，被驱动判定超时踢下线（<code>deauthenticated due to inactivity</code>）。<br>
             3. <strong>低 ACK 响应踢出机制</strong>：系统默认开启了弱信号丢包踢除机制，信号稍有波动即强行掐断连接。
           </div>
         </div>
