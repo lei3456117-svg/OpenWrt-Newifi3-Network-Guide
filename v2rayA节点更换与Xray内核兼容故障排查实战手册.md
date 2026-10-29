@@ -145,3 +145,112 @@ ip(192.168.1.198) -> direct
 
 - **绑定节点原则**：左上角 `PROXY` 连日常香港/台湾节点；左上角 `OpenAi` 连美国节点。
 - **核心状态**：点击左上角红色「就绪」，转为绿色「运行中」即代表工作正常。
+
+---
+
+## 六、 v2rayA 透明代理重大配置天坑：为什么写了规则却对局域网设备无效？
+
+> [!WARNING]
+> **致命天坑：透明代理默认独立于 RoutingA 规则**
+> 很多用户在 v2rayA 的「RoutingA」中写好了分流规则，但**局域网电脑、手机通过路由器直接上网时，完全没有走这些规则**（依然被拦截或走默认节点）。这是因为 v2rayA 将「规则分流端口（20171/20172）」与「透明代理」分成了两套独立逻辑！
+
+### 1. 根因剖析：透明代理未注入 RoutingA 规则
+在 v2rayA 设置中，「透明代理/系统代理」默认项为 `启用: 大陆白名单模式`。此时透明代理入站（`transparent`）只会匹配内置的大陆白名单，**完全抛弃你写的 RoutingA 自定义规则**！只有把透明代理规则关联到规则端口，所有局域网设备才会真正生效。
+
+### 2. 正确设置步骤（20 秒完成）
+1. 打开 `http://192.168.1.1:2017`，点击右上角齿轮图标「设置」。
+2. 找到弹窗**最上方第一行**「透明代理/系统代理」下拉菜单（切勿点错成第二行实现方式或第三行规则端口）。
+3. 在弹出的 5 个选项中，点击最底部的 **`启用: 分流规则与规则端口所选模式一致`**。
+4. 确认第三行「规则端口的分流模式」为 `RoutingA`，点击右下角黄色「保存并应用」。
+
+### 3. 验证生效状态
+生效后，路由器底层 `/etc/v2raya/config.json` 中的每条路由规则都会自动挂载 `"inboundTag":["rule-http","rule-socks","transparent"]`，代表整网所有透明代理流量 100% 遵照你的 RoutingA 执行。
+
+---
+
+## 七、 Cursor / AI 云端 Agent 登录死循环与网络风控排查实战
+
+> [!WARNING]
+> **现象：Cursor 登录卡死、Cloudflare 5秒盾循环或 nonce_mismatch 报错**
+> 访问 `https://cursor.com/dashboard/cloud-agents` 或登录客户端时，频繁卡在 `Loading…`、Cloudflare 人机验证盾，或回调报 `auth_error=nonce_mismatch` 无限刷新。
+
+### 1. 缺少配套鉴权域名导致跨 IP / 跨国家冲突
+Cursor 使用 WorkOS 作为底层 SSO 认证，并依赖 Cloudflare Turnstile 防护。如果分流规则仅包含 `cursor.com`，鉴权服务 `api.workos.com` 就会走到默认普通代理（甚至直连）。跨 IP / 跨国家的数据交换会被 Cloudflare 判定为黑客会话劫持，直接拦截并陷入验证盾死循环。
+
+**对策**：在 `OpenAi` 出口规则中完整补齐 WorkOS 域名：
+```text
+domain(workos.com) -> OpenAi
+domain(workoscdn.com) -> OpenAi
+domain(cursorusercontent.com) -> OpenAi
+```
+
+### 2. 源码级排查：Cursor 前端硬编码 1 秒连通性探测
+深入抓包提取 `cursor.com/api/auth/bot/login` 前端代码，发现其内置了极度苛刻的安全探针：
+```javascript
+// Cursor 登录页前端探针核心源码片段
+p: "https://accounts.x.ai/api/healthz",
+t: 1000 // 硬编码：严格限制 1000 毫秒（1 秒）必须完成响应！
+```
+如果当前连接的美国节点属于**普通机房 IDC 节点**，跨洋延迟波动超过 1 秒或直接被 xAI 报 403 Forbidden，前端就会强制认定“网络受阻”，强行重置认证并丢弃 Cookie，抛出 `auth_error=nonce_mismatch`。随后页面自动刷新并重新触发 1 秒探测，形成**无限重定向死循环**！
+
+### 3. 机场选线黄金法则（为什么贵的机场感觉不如便宜的？）
+高价机场（如 WgetCloud）的节点列表中包含不同档位：
+- **普通中继节点（如 `美国 01/02`）**：走常规公网出口，公用机房 IP 容易被 AI 厂商风控，延迟超 1 秒便会触发死循环。
+- **真正高价值的专线节点（如 `[IPLC·US] 专线`、`中继 AI`）**：走独立物理专用光缆，物理延迟极低（<150ms），且 IP 经过纯净清洗。
+
+**对策**：在 v2rayA 界面将 `OpenAi` 出站明确切换到 **`[IPLC·US] 美国815|IPLC专线`** 或 **`美国635 中继 AI`**，即可秒过 1 秒探针，顺利完成登录。
+
+---
+
+## 八、 国内大型服务冷启动卡顿剖析：以腾讯元宝“每次首次打开都需要重试”为例
+
+> [!NOTE]
+> **现象：首次访问国内新平台总是报错“请重试”，点击重试后恢复正常**
+> 例如打开 `https://yuanbao.tencent.com/e/evt/rm2027`，每次冷启动都会弹出“加载失败，请重试”，二次刷新却能秒开。
+
+### 1. 根因揭秘：新 CDN 域名不在 geosite 库 + MIPS 芯片首次解析延迟
+1. 腾讯元宝 2024 年新增的核心静态资源域名（如 `userassets.tencentyuanbao.com`）是全新独立域名，**未收录在路由器的旧版 `geosite.dat` 规则库中**。
+2. 路由器遇到未命中的域名时，会触发 `IPOnDemand` 机制（临时通过 DNS 解析 IP 以匹配 `geoip:cn`）。
+3. Newifi 3 的 MIPS 架构 CPU 在首次解析匹配时产生了轻微等待，**超过了网页前端 1 秒的 TLS 握手超时限制（抓包捕获 `SSL_ERROR_SYSCALL` 连接重置）**，页面直接报错。
+4. 点击“重试”时，DNS 已经缓存在内存中，第二次便能直接放行。
+
+### 2. 一劳永逸修复：显式增加国内大厂顶级域直连
+在 RoutingA 底部显式增加常用顶级域直连规则，让路由器在 TLS ClientHello 嗅探到的瞬间 **0 毫秒放行**，无需等待任何 DNS 解析：
+```text
+# 腾讯与元宝全系直连（消除首次冷启动超时）
+domain(tencent.com) -> direct
+domain(tencentyuanbao.com) -> direct
+domain(qq.com) -> direct
+domain(geosite:cn) -> direct
+ip(geoip:private, geoip:cn) -> direct
+```
+
+---
+
+## 九、 Newifi 3 (D2) 路由器 WiFi 频频掉线与 5G 芯片硬件崩溃加固实战
+
+> [!CAUTION]
+> **内核日志捕获铁证：5G 芯片硬件崩溃重置**
+> 终端设备频繁掉线、外网断流。登录路由器查看内核日志（`dmesg`），抓到了硬件报错：  
+> `[103539.761045] ieee80211 phy1: Hardware restart was requested`  
+> 这证明 WiFi 掉线是路由器无线芯片驱动发生了崩溃重启，而非外网宽带或机场断流。
+
+### 1. 3 大掉线根因
+1. **36 低频信道 Bug**：Newifi 3 的 `MT76x2E` 5G 芯片在 36 信道配合 80MHz 频宽（VHT80）且缺省国家码时，易触发开源驱动看门狗强行重启。
+2. **双频同名踢线**：2.4G 与 5G 采用相同名称（如 `Depp`）而未启用 802.11k/v/r 漫游守护时，终端设备在双频间频繁跳变，被驱动判定超时踢下线（`deauthenticated due to inactivity`）。
+3. **低 ACK 响应踢出机制**：系统默认开启了弱信号丢包踢除机制，信号稍有波动即强行掐断连接。
+
+### 2. 网页后台加固步骤（1 分钟完成）
+登录 OpenWrt 网页后台 `http://192.168.1.1` $\to$ 点击「网络」 $\to$ 「无线」 $\to$ 找到 5G（`radio1`）点击「编辑」：
+1. **滑到最上方「设备配置」-「常规设置」**：
+   - **信道**：由 36 改为 **`149 (5.745 GHz)`**（国内纯净高频，避开驱动崩溃 Bug）。
+   - **国家代码**：下拉选择 **`CN - China`**（锁死中国无线电规范）。
+2. **切换到「接口配置」-「高级设置」**：
+   - **弱信号剔除 / Disassociate on low acknowledgement**：**取消勾选**。
+3. 点击右下角绿色「保存」，随后点击页面右上角蓝色「保存并应用」。
+
+### 3. 终端一键加固命令（备用）
+若不想在网页中查找，在 Mac 终端执行下方一行命令即可完成上述所有加固并自动重载驱动：
+```bash
+ssh root@192.168.1.1 "uci set wireless.radio0.country='CN' && uci set wireless.radio1.country='CN' && uci set wireless.radio1.channel='149' && uci set wireless.default_radio0.disassoc_low_ack='0' && uci set wireless.default_radio1.disassoc_low_ack='0' && uci commit wireless && wifi reload"
+```
