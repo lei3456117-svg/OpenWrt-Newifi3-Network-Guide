@@ -119,8 +119,10 @@ domain(cursorusercontent.com) -> OpenAi
 domain(x.ai) -> OpenAi
 domain(grok.com) -> OpenAi
 
-# 国内常用服务直连
-domain(domain:mail.qq.com) -> direct
+# 国内常用服务与腾讯全系直连（防冷启动解析超时）
+domain(tencent.com) -> direct
+domain(tencentyuanbao.com) -> direct
+domain(qq.com) -> direct
 domain(geosite:cn) -> direct
 ip(geoip:private, geoip:cn) -> direct
 
