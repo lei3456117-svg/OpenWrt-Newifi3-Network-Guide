@@ -358,14 +358,14 @@ t: 1000 // 硬编码：严格限制 1000 毫秒（1 秒）必须完成响应！<
         </div>
 
         <div class="step-item">
-          <div class="step-title">问题 3：机场选线黄金法则（为什么贵的机场感觉不如便宜的？）</div>
+          <div class="step-title">问题 3：服务商选线黄金法则（优先选择专线与 AI 专属节点）</div>
           <div class="step-desc">
-            很多高价机场（如 WgetCloud）的节点列表中包含不同档位：
+            服务商提供的节点列表中通常包含不同功能与质量档位：
             <ul style="padding-left: 20px; margin: 8px 0;">
-              <li><strong>普通中继节点（如 <code>美国 01/02</code>）</strong>：走常规公网出口，公用机房 IP 容易被 AI 厂商风控，延迟超 1 秒便会触发死循环。</li>
-              <li><strong>真正高价值的专线节点（如 <code>[IPLC·US] 专线</code>、<code>中继 AI</code>）</strong>：走独立物理专用光缆，物理延迟极低（&lt;150ms），且 IP 经过纯净清洗。</li>
+              <li><strong>普通公网中继节点</strong>：走常规机房公网出口，IP 容易被 AI 厂商风控拉黑，跨洋公网抖动超过 1 秒便会触发死循环。</li>
+              <li><strong>高价值专线与 AI 专属节点</strong>：走物理专用光缆（IPLC/IEPL），物理延迟极低（&lt;150ms），且出口多为经过纯净清洗的商用/住宅 IP。</li>
             </ul>
-            <strong>对策</strong>：在 v2rayA 界面将 <code>OpenAi</code> 出站明确切换到 <strong><code>[IPLC·US] 美国815|IPLC专线</code></strong> 或 <strong><code>美国635 中继 AI</code></strong>，即可秒过 1 秒探针，顺利完成登录。
+            <strong>对策</strong>：在 v2rayA 界面将 <code>OpenAi</code> 出站明确切换到带有 <strong>「IPLC 专线」</strong> 或 <strong>「AI 专属 / 解锁」</strong> 标识的优质美国节点，即可秒过 1 秒探针，顺利完成登录。
           </div>
         </div>
       </div>
