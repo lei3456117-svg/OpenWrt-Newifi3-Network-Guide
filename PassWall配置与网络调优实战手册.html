@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PassWall 企业级配置与网络深度调优实战手册 (Newifi 3 D2 终极稳定版)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --code-bg: #090d16;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 24px;
+    }
+    .container { max-width: 920px; margin: 0 auto; }
+    header { padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+    h1 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .meta-badges { display: flex; flex-wrap: wrap; gap: 10px; }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500;
+      background-color: var(--border); color: var(--text-muted);
+    }
+    .badge.green { background-color: rgba(34, 197, 94, 0.15); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge.blue { background-color: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge.orange { background-color: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+    h2 { font-size: 19px; font-weight: 600; margin: 36px 0 16px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    h3 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: #fff; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .step-list { list-style: none; counter-reset: step-counter; }
+    .step-item { position: relative; padding-left: 42px; margin-bottom: 20px; }
+    .step-item:last-child { margin-bottom: 0; }
+    .step-item::before {
+      content: counter(step-counter); counter-increment: step-counter; position: absolute; left: 0; top: 0;
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #000; font-weight: 700;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+    }
+    .step-title { font-weight: 600; color: #fff; font-size: 15px; margin-bottom: 6px; }
+    .step-desc { color: var(--text-muted); font-size: 14px; }
+    pre {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+      overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px; color: #e2e8f0; margin-top: 10px; line-height: 1.5;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent);
+    }
+    .alert { border-left: 4px solid; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; background: rgba(255, 255, 255, 0.03); }
+    .alert.info { border-color: var(--accent); }
+    .alert.warn { border-color: var(--warning); }
+    .alert.success { border-color: var(--success); }
+    .alert.danger { border-color: var(--danger); }
+    .alert-title { display: block; margin-bottom: 6px; font-weight: 600; color: #fff; font-size: 14.5px; }
+    .alert strong { color: #fff; font-weight: 600; }
+    .alert p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255, 255, 255, 0.04); color: var(--accent); font-weight: 600; }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
+    .back-nav { margin-bottom: 20px; }
+    .back-nav a { color: var(--accent); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+    .back-nav a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="back-nav">
+    <a href="index.html">← 返回项目主首页</a>
+  </div>
+
+  <header>
+    <h1>PassWall 企业级配置与网络深度调优实战手册</h1>
+    <div class="meta-badges">
+      <span class="badge blue">设备: Newifi 3 (D2) MT7621</span>
+      <span class="badge green">固件: ImmortalWrt 23.05.4</span>
+      <span class="badge green">插件: PassWall (Trojan-Plus / Xray)</span>
+      <span class="badge orange">联动: 铁威马 NAS (0.49ms / 19ms)</span>
+      <span class="badge">验证: 2026-10-31 全量通过</span>
+    </div>
+  </header>
+
+  <h2>一、 架构迭代背景：为何弃用 v2rayA 切换至 PassWall？</h2>
+  <div class="card">
+    <p style="color: var(--text-muted); font-size: 14.5px; margin-bottom: 14px;">
+      在此前的使用中，Newifi 3 曾运行 OpenWrt 25.12.5 快照版与 v2rayA。但随着网络设备与服务增多，遭遇了多重底层瓶颈：
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>对比维度</th>
+          <th>v2rayA 架构痛点</th>
+          <th>ImmortalWrt 23.05.4 + PassWall 方案</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>系统稳定性</strong></td>
+          <td>25.12.5 快照版在 MT7621 MIPS 架构下 Go 符号表偶发越界，报错 <code>panic before malloc heap initialized</code></td>
+          <td>官方成熟稳定版（23.05.4），内核 5.15 驱动成熟，零内存越界崩溃</td>
+        </tr>
+        <tr>
+          <td><strong>内存与负载</strong></td>
+          <td>常驻内存高，启停时无法彻底回收，内存余量常低于 50MB</td>
+          <td>纯 C / 紧凑 Go 架构，系统空闲内存高达 <strong>320MB+</strong>，CPU 负载长期仅 <strong>0.2~0.3</strong></td>
+        </tr>
+        <tr>
+          <td><strong>节点协议兼容</strong></td>
+          <td>捆绑的新版 Xray 删除了 <code>allowInsecure: true</code>，导致伪装 SNI 的 Trojan 节点证书握手失败</td>
+          <td>原生支持 <code>Trojan-Plus</code> 与 <code>Xray</code> 双引擎，100% 兼容各类中转机场节点</td>
+        </tr>
+        <tr>
+          <td><strong>透明代理与分流</strong></td>
+          <td>独立于系统防火墙，容易截胡局域网内部通信，配置复杂且易与终端客户端冲突</td>
+          <td>基于 nftables / iptables 底层链式分流，支持端口级、IP 级无损旁路放行</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>二、 PassWall 安装与核心组件部署</h2>
+  <div class="card">
+    <ol class="step-list">
+      <li class="step-item">
+        <div class="step-title">软件源更新与安装</div>
+        <div class="step-desc">进入路由器后台 <strong>系统 -> 软件包</strong>，点击 <strong>更新列表...</strong>，搜索并安装：<br>
+        <code>luci-app-passwall</code> 与 <code>luci-i18n-passwall-zh-cn</code>。<br>
+        安装完成后刷新后台，顶部导航栏即出现 <strong>服务 -> PassWall</strong> 菜单。</div>
+      </li>
+      <li class="step-item">
+        <div class="step-title">节点导入与密码丢失排障（关键避坑）</div>
+        <div class="step-desc">部分机场订阅转换脚本在导入特定 Trojan 节点时，密码字段（UUID）在前端提交时变空，导致 PassWall 无法启动：</div>
+        <pre><code># 1. SSH 登录路由器，查找节点 ID
+uci show passwall | grep -iE '美国|US'
+
+# 2. 补全对应节点的密码字段并生效
+uci set passwall.&lt;节点ID&gt;.password='你的节点密码或UUID'
+uci commit passwall
+/etc/init.d/passwall restart</code></pre>
+      </li>
+    </ol>
+  </div>
+
+  <h2>三、 整网打通：NAS 与 Tailscale 打洞深度调优</h2>
+  <div class="card">
+    <div class="alert warn">
+      <span class="alert-title">⚠️ 代理插件导致 Tailscale 变卡的根因剖析</span>
+      <p>
+        PassWall 默认接管所有 UDP 流量（<code>1:65535</code>）。Tailscale 发送的 STUN 打洞探测包（端口 3478）和通信包（端口 41641）被路由器代理抓包并转发至海外服务器，导致两端无法完成 NAT 穿透握手，被迫降级为延迟高达 <strong>1500ms+ 的香港中继 DERP(hkg)</strong>！
+      </p>
+    </div>
+
+    <h3>核心调优三部曲：</h3>
+    <ol class="step-list">
+      <li class="step-item">
+        <div class="step-title">PassWall 放行 Tailscale 通信端口</div>
+        <div class="step-desc">在 PassWall 转发设置中将 STUN 与 Tailscale 端口加入非代理列表：</div>
+        <pre><code>uci set passwall.@global_forwarding[0].udp_no_redir_ports='3478,41641'
+uci commit passwall
+/etc/init.d/passwall restart</code></pre>
+        <div class="step-desc" style="margin-top: 6px;">验证生效：<code>nft list table inet passwall | grep 41641</code> 会输出 <code>udp dport { 3478, 41641 } counter return</code>，证明打洞数据直接放行，不再进代理。</div>
+      </li>
+      <li class="step-item">
+        <div class="step-title">防火墙配置静态端口转发 (DNAT)</div>
+        <div class="step-desc">外部打洞连接需要能穿透路由器直接抵达 NAS：</div>
+        <pre><code>uci add firewall redirect
+uci set firewall.@redirect[-1].name='tailscale'
+uci set firewall.@redirect[-1].src='wan'
+uci set firewall.@redirect[-1].proto='udp'
+uci set firewall.@redirect[-1].src_dport='41641'
+uci set firewall.@redirect[-1].dest_ip='192.168.1.198'
+uci set firewall.@redirect[-1].dest_port='41641'
+uci set firewall.@redirect[-1].target='DNAT'
+uci commit firewall
+/etc/init.d/firewall restart</code></pre>
+      </li>
+      <li class="step-item">
+        <div class="step-title">启用 Full Cone NAT（全锥型 NAT）</div>
+        <div class="step-desc">在防火墙配置中确保开启全锥型 NAT 加速：</div>
+        <pre><code>uci set firewall.@defaults[0].fullcone='1'
+uci commit firewall</code></pre>
+        <div class="step-desc" style="margin-top: 6px;">在终端运行 <code>tailscale netcheck</code>，输出 <code>MappingVariesByDestIP: false</code>，代表路由器已工作在全锥型独立映射模式，为打洞提供最高成功率。</div>
+      </li>
+    </ol>
+  </div>
+
+  <h2>四、 铁威马 NAS 局域网与远程两套 IP 访问法则</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>使用场景</th>
+          <th>访问入口</th>
+          <th>网络协议</th>
+          <th>实测延迟</th>
+          <th>实际传输速率</th>
+          <th>适用业务</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>公司办公室内</strong></td>
+          <td><code>smb://192.168.1.198</code></td>
+          <td>局域网物理直连</td>
+          <td><strong>0.4ms ~ 0.8ms</strong></td>
+          <td><strong>110MB/s ~ 280MB/s</strong> (千兆跑满)</td>
+          <td>大文件剪辑、备份、工程协同</td>
+        </tr>
+        <tr>
+          <td><strong>居家 / 异地出差</strong></td>
+          <td><code>smb://100.87.114.20</code></td>
+          <td>Tailscale P2P 穿透</td>
+          <td><strong>19ms ~ 35ms</strong></td>
+          <td>跑满办公室宽带上行上限</td>
+          <td>远程资料调取、代码同步</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert danger">
+      <span class="alert-title">🚨 避坑警示</span>
+      <p>人在办公室时，切勿通过 <code>100.87.114.20</code> 挂载硬盘！否则会触发路由器 NAT 回环（Hairpinning），导致本可在内网传输的流量绕道外网，不仅增加路由器负荷，还会导致速度骤降。</p>
+    </div>
+  </div>
+
+  <h2>五、 Wi-Fi 5G 芯片硬件防崩溃加固</h2>
+  <div class="card">
+    <div class="alert danger">
+      <span class="alert-title">💥 硬件崩溃日志还原</span>
+      <p>Newifi 3 的 5G 无线芯片为联发科 <code>MT76x2E</code>。当 5G 工作在低频 36 信道且开启了弱信号剔除时，路由器内核日志（<code>dmesg</code>）会不断报错并掉线：<br>
+      <code>[103539.761045] ieee80211 phy1: Hardware restart was requested</code></p>
+    </div>
+
+    <h3>终极加固命令：</h3>
+    <pre><code># 1. 锁死中国国家代码
+uci set wireless.radio0.country='CN'
+uci set wireless.radio1.country='CN'
+
+# 2. 5G 切换到高频纯净信道 149 (5.745 GHz)
+uci set wireless.radio1.channel='149'
+
+# 3. 关闭弱信号丢包踢除机制（避免移动设备跳频掉线）
+uci set wireless.default_radio0.disassoc_low_ack='0'
+uci set wireless.default_radio1.disassoc_low_ack='0'
+
+# 4. 提交配置并重载 Wi-Fi 驱动
+uci commit wireless
+wifi reload</code></pre>
+  </div>
+
+  <h2>六、 域名分流与 AI 业务规则设计</h2>
+  <div class="card">
+    <div class="step-title" style="color: var(--accent); margin-bottom: 8px;">1. 节点分配原则</div>
+    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+      TCP 主节点优先选用 <strong><code>[IPLC·US] 美国</code></strong> 专线。物理延迟稳定（~140ms），出口 IP 纯净，100% 兼容 OpenAI / ChatGPT、Google Gemini / AI Studio、Anthropic / Claude、Cursor (含 WorkOS 鉴权及 x.ai 探针)。
+    </p>
+
+    <div class="step-title" style="color: var(--accent); margin-bottom: 8px;">2. DNS 防污染与国内秒开</div>
+    <p style="color: var(--text-muted); font-size: 14px;">
+      通过 <code>ChinaDNS-NG</code> + <code>Dnsmasq</code> 深度防污染方案，国内域名直连 <code>223.5.5.5</code>，海外域名走安全远程 DNS（<code>1.1.1.1</code>），同时 <code>chnroute</code> 大陆 IP 集合在内核层 0 毫秒放行，彻底消除冷启动握手超时。
+    </p>
+  </div>
+
+  <h2>七、 常用维护与排障速查表</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>操作需求</th>
+          <th>终端执行命令</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>重启 PassWall</strong></td>
+          <td><code>/etc/init.d/passwall restart</code></td>
+        </tr>
+        <tr>
+          <td><strong>查看 PassWall 运行日志</strong></td>
+          <td><code>logread | grep -i passwall | tail -n 30</code></td>
+        </tr>
+        <tr>
+          <td><strong>查看系统剩余内存与负载</strong></td>
+          <td><code>uptime; free -m</code></td>
+        </tr>
+        <tr>
+          <td><strong>测试外网连接状态 (Google)</strong></td>
+          <td><code>curl -I -s --connect-timeout 4 -x socks5h://127.0.0.1:1070 https://www.google.com | head -n 3</code></td>
+        </tr>
+        <tr>
+          <td><strong>测试国内直连速度 (百度)</strong></td>
+          <td><code>curl -I -s --connect-timeout 4 https://www.baidu.com | head -n 3</code></td>
+        </tr>
+        <tr>
+          <td><strong>测试 NAS 内网端口</strong></td>
+          <td><code>nc -zv -w 2 192.168.1.198 445</code></td>
+        </tr>
+        <tr>
+          <td><strong>测试 Tailscale 远程端口</strong></td>
+          <td><code>nc -zv -w 2 100.87.114.20 445</code></td>
+        </tr>
+        <tr>
+          <td><strong>查看 5G 无线工作状态</strong></td>
+          <td><code>uci show wireless.radio1</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

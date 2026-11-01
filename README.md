@@ -244,3 +244,17 @@ domain(geosite:cn) -> direct
 ip(geoip:private, geoip:cn) -> direct
 ```
 
+---
+
+## 五、 插件更换与固件升级：ImmortalWrt 23.05.4 + PassWall 企业级配置与网络深度调优实战 (2026-10-31 增补)
+
+### 1. 深度故障排错与调优手册
+- 📄 **Markdown 完整手册**：[`PassWall配置与网络调优实战手册.md`](PassWall配置与网络调优实战手册.md)
+- 🌐 **独立排版 HTML 手册**：[`PassWall配置与网络调优实战手册.html`](PassWall配置与网络调优实战手册.html)
+
+### 2. 核心架构升级与三大关键突破
+* **内存余量暴增至 320MB+**：彻底告别 25.12 快照版与 v2rayA 的 MIPS Go runtime panic 缺陷，切换至官方稳定版 ImmortalWrt 23.05.4 + PassWall，CPU 负载仅 0.2~0.3。
+* **Tailscale P2P 异地打洞完美打通**：PassWall 显式排除 `3478, 41641` UDP 端口，避免代理截胡握手包导致 1500ms DERP 香港中继；配合防火墙 DNAT 映射与 Full Cone NAT，实现 19ms 满速直连。
+* **5G Wi-Fi 芯片防崩溃加固**：MT7621/MT76x2E 锁死 149 高频纯净信道并关闭弱信号剔除，根除 `Hardware restart was requested` 掉线 Bug。
+
+
